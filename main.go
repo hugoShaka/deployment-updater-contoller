@@ -39,12 +39,7 @@ func init() {
 	utilruntime.Must(SchemeBuilder.AddToScheme(scheme))
 }
 
-type statefulsetVersionReconciler struct {
-	kclient.Client
-	Scheme  *runtime.Scheme
-	vClient versionClient
-}
-
+// The client responsible for fetching the version, cahcing it, and doing security checks
 type versionClient struct {
 	mu         sync.Mutex
 	version    string
@@ -67,6 +62,13 @@ func (v *versionClient) Version(ctx context.Context) (string, error) {
 	}
 	v.version = *release.TagName
 	return v.version, nil
+}
+
+// Reconciles a statefulset by changing its image
+type statefulsetVersionReconciler struct {
+	kclient.Client
+	Scheme  *runtime.Scheme
+	vClient versionClient
 }
 
 func (r *statefulsetVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -92,6 +94,7 @@ func (r *statefulsetVersionReconciler) SetupWithManager(mgr ctrl.Manager) error 
 		Complete(r)
 }
 
+// Reconciles a deployment by changing its image
 type deploymentVersionReconciler struct {
 	kclient.Client
 	Scheme  *runtime.Scheme
@@ -156,6 +159,7 @@ func main() {
 		}),
 	})
 
+	// Controller registration
 	_ = (&statefulsetVersionReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -166,6 +170,7 @@ func main() {
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr)
 
+	// Running
 	if err := mgr.Start(ctx); err != nil {
 		os.Exit(1)
 	}
